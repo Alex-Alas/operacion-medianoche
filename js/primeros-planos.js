@@ -189,9 +189,9 @@ function portraitControl(mood = 'neutral', open = false) {
   s += `<rect width="200" height="200" fill="url(#scanl)" opacity=".5"/>`;
   return `<svg viewBox="22 14 156 156"><defs><pattern id="scanl" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="2" fill="#000" opacity=".25"/></pattern></defs>${s}</svg>`;
 }
-function portraitStatic() {
+function portraitStatic(txt = 'SIN SEÑAL') {
   return `<svg viewBox="0 0 200 200"><rect width="200" height="200" fill="#0d1112"/><rect width="200" height="200" filter="url(#tv)"/>
-    <text x="100" y="108" text-anchor="middle" font-family="${typeFont}" font-weight="bold" font-size="16" fill="#e6f0e8" opacity=".85">SIN SEÑAL</text></svg>`;
+    <text x="100" y="108" text-anchor="middle" font-family="${typeFont}" font-weight="bold" font-size="16" fill="#e6f0e8" opacity=".85">${txt}</text></svg>`;
 }
 
 /* ---------- Íconos del inventario (64×64) ---------- */

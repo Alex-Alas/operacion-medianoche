@@ -4,7 +4,7 @@
    objetos, pistas, CRT, dial, teléfono, radio y golpes de tensión.
    ===================================================================== */
 const Sfx = (() => {
-  let ctx = null, master = null, muted = false, neonGain = null, ringTimer = null;
+  let ctx = null, master = null, muted = false, neonGain = null, ringTimer = null, humNodes = null, motorNode = null;
   const now = () => ctx.currentTime;
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -68,5 +68,44 @@ const Sfx = (() => {
       ring(); ringTimer = setInterval(ring, 2600);
     },
     ringStop() { clearInterval(ringTimer); ringTimer = null; },
+    /* --- Cap. 2: la recepción --- */
+    // Zumbido de los tubos (con corriente) y un bordón grave que crece con la presencia
+    hum(power, p) {
+      if (!ctx) return;
+      if (!humNodes) {
+        const fl = ctx.createOscillator(), bp = ctx.createBiquadFilter(), fg = ctx.createGain();
+        fl.type = 'sawtooth'; fl.frequency.value = 100; bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 2; fg.gain.value = 0;
+        fl.connect(bp).connect(fg).connect(master); fl.start();
+        const dg = ctx.createGain(); dg.gain.value = 0; dg.connect(master);
+        for (const f of [46, 69.3]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(dg); o.start(); }
+        humNodes = { fg, dg };
+      }
+      humNodes.fg.gain.setTargetAtTime(power ? 0.008 + p * 0.01 : 0, now(), 0.08);
+      humNodes.dg.gain.setTargetAtTime(Math.max(0, p - 0.3) * 0.09, now(), 0.4);
+    },
+    spark() { for (let i = 0; i < 4; i++) burst(0.04, 3500, 'highpass', 0.35, i * 0.07 + Math.random() * 0.03); tone(60, 0.35, 'sawtooth', 0.09, 0, 30); },
+    powerOn() { burst(0.25, 120, 'lowpass', 0.8, 0, true); tone(50, 0.9, 'sawtooth', 0.05, 0, 100); [0.35, 0.5, 0.62, 0.9].forEach(t => burst(0.03, 2600, 'bandpass', 0.2, t)); },
+    screw() { burst(0.05, 2200, 'bandpass', 0.16); tone(380, 0.06, 'square', 0.025, 0.03); },
+    plug() { burst(0.03, 2500, 'bandpass', 0.25); tone(820, 0.05, 'square', 0.03, 0.02); burst(0.4, 1800, 'bandpass', 0.05, 0.05); },
+    busy() { for (let i = 0; i < 4; i++) tone(425, 0.35, 'sine', 0.06, i * 0.7); },
+    punch() { burst(0.12, 220, 'lowpass', 0.7, 0, true); tone(180, 0.08, 'square', 0.08); burst(0.02, 3000, 'bandpass', 0.2, 0.12); tone(1568, 0.5, 'sine', 0.05, 0.18); },
+    bell() { tone(2093, 1.6, 'sine', 0.12); tone(3140, 1.0, 'sine', 0.05); tone(4186, 0.6, 'sine', 0.03); },
+    buzz() { tone(150, 0.4, 'square', 0.05); tone(153, 0.4, 'square', 0.05); },
+    ding() { tone(1318, 0.9, 'sine', 0.08); tone(1046, 1.2, 'sine', 0.08, 0.25); },
+    motor(on) {
+      if (!ctx) return;
+      if (on && !motorNode) {
+        const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'sawtooth'; o.frequency.value = 52; lp.type = 'lowpass'; lp.frequency.value = 260; g.gain.value = 0;
+        o.connect(lp).connect(g).connect(master); o.start(); g.gain.setTargetAtTime(0.07, now(), 0.4); motorNode = { o, g };
+      } else if (!on && motorNode) { const m = motorNode; motorNode = null; m.g.gain.setTargetAtTime(0, now(), 0.15); setTimeout(() => m.o.stop(), 900); }
+    },
+    doors() { burst(1.1, 600, 'bandpass', 0.1); tone(90, 1.0, 'triangle', 0.05, 0, 70); },
+    blackout() { burst(0.6, 90, 'lowpass', 0.9, 0, true); tone(55, 1.6, 'sawtooth', 0.07, 0, 30); burst(1.4, 500, 'bandpass', 0.06, 0.4, true); },
+    knock() { [0, 0.2, 0.4].forEach(t => { burst(0.06, 260, 'lowpass', 0.6, t, true); tone(95, 0.08, 'sine', 0.12, t); }); },
+    rattle() { for (let i = 0; i < 8; i++) burst(0.03, 1900, 'bandpass', 0.16, i * 0.11 + Math.random() * 0.04); },
+    breath() { burst(1.6, 700, 'bandpass', 0.07, 0, true); },
+    shutter() { burst(0.02, 3200, 'bandpass', 0.35); burst(0.03, 1600, 'bandpass', 0.25, 0.09); tone(2600, 0.7, 'sine', 0.02, 0.15, 6000); },
+    echoClick() { tone(1400, 0.03, 'square', 0.03, 1); },
   };
 })();

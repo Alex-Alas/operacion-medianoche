@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Operación Medianoche</title>
-<meta name="description" content="Demo jugable: aventura de investigación en primera persona. Una oficina abandonada, una caja fuerte y tres pistas.">
+<meta name="description" content="Aventura de investigación en primera persona, en dos capítulos. Una oficina abandonada, una caja fuerte, tres pistas… y una recepción de la que no es tan fácil salir.">
 <!--
   OPERACIÓN MEDIANOCHE — demo de aventura de investigación point-and-click.
   Un único archivo: HTML + CSS + JavaScript puro, sin dependencias externas.
@@ -43,6 +43,8 @@
     <svg id="sceneLight" class="lay" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
     <svg id="scene" class="lay" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img" aria-label="La oficina de Aurelio Ferraz, de noche"></svg>
     <div id="flash"></div>
+    <!-- Apagón (cap. 2): negro total y, en el destello, lo que hay en la recepción -->
+    <div id="blackout"><svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"></svg></div>
     <div id="corner">
       <button class="cbtn" id="btnHint" title="Pensar (pista)"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span class="lab">Pensar</span></button>
       <button class="cbtn" id="btnBook" title="Libreta (N)"><svg viewBox="0 0 24 24"><path d="M5 3h12a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2zM5 17a2 2 0 0 1 2-2h12M9 7h6M9 10h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span class="lab">Libreta</span></button>
@@ -59,6 +61,9 @@
         <button class="cbtn" id="cuBack" title="Volver (Esc)">✕ Volver</button>
       </div>
     </section>
+
+    <!-- Lámina a pantalla completa (la calle, al final del cap. 2) -->
+    <section id="cine" class="overlay"><svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"></svg></section>
 
     <!-- Diálogo con retrato (comunicador) -->
     <section id="dialog" class="overlay" aria-live="polite">
@@ -102,13 +107,16 @@
     <p>Observa. Haz clic en lo que te llame la atención. Usa los objetos del inventario sobre la escena. Ferraz escondió la combinación en tres partes.</p>
     <div class="row">
       <button class="btn" id="btnStart">ACEPTAR MISIÓN</button>
-      <span style="font:13px var(--type);opacity:.75">Con sonido · ~10 minutos</span>
+      <button class="btn ghost" id="btnCont" hidden>CONTINUAR · CAP. 2</button>
+      <span style="font:13px var(--type);opacity:.75">Con sonido · 2 capítulos · ~25 minutos</span>
     </div>
   </div>
 </section>
 
 <!-- Informe final -->
 <section id="ending"><div class="dossier paperSheet" id="endSheet"></div></section>
+
+<div id="fade"></div>
 
 <div id="rotateHint"><div><p style="font:bold 20px var(--type)">Gira el teléfono</p><p style="font:14px var(--type);opacity:.8">La oficina se ve mejor acostada.</p><button class="btn ghost" id="btnRotateAnyway">Jugar igual</button></div></div>
 
@@ -118,5 +126,10 @@
 <script src="js/audio.js"></script>
 <script src="js/juego.js"></script>
 <script src="js/cap1.js"></script>
+<script src="js/escena-recepcion.js"></script>
+<script src="js/primeros-planos-recepcion.js"></script>
+<script src="js/presencia.js"></script>
+<script src="js/cap2.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

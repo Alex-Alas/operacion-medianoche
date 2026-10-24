@@ -1,14 +1,35 @@
 /* =====================================================================
-   [6] INTERACCIONES: escena principal, primeros planos, UV, caja fuerte,
-   teléfono, ambiente vivo, final y arranque.
+   [6] CAPÍTULO 1 · LA OFICINA: pistas, zonas de clic, primeros planos,
+   computadora, caja fuerte, teléfono y el enlace con el capítulo 2.
    ===================================================================== */
-const once = k => (S.seen[k] ? false : (S.seen[k] = true));
+const ANSWER = [14, 23, 31];             // luna (día del cierre) · ojo (23 rayas) · ancla (XXXI)
+const CLUE_NAMES = { luna: 'LUNA', ojo: 'OJO', ancla: 'ANCLA' };
+// Rarezas: detalles opcionales que no cuadran (se anotan en la libreta y en el informe)
+const ODD = {
+  abrigo:  'El abrigo del perchero está mojado. Afuera llueve; la oficina lleva cerrada desde 1987.',
+  taza:    'Labial fresco en una taza de café de hace 37 años.',
+  acceso:  'Último acceso a la computadora: hoy, 23:41. Seis minutos antes de que yo llegara.',
+  polilla: 'Una carpeta con mi nombre clave en el archivador. Recién vaciada.',
+  llamada: 'Una llamada a un teléfono sin línea. Sabían mi nombre.',
+  pared:   '«Te estábamos esperando», escrito en tinta UV en lo alto de la pared.',
+};
+const clueCount = () => Object.values(S.clues).filter(Boolean).length;
 
-/* ---------- Etiqueta flotante sobre lo que se puede tocar ---------- */
-const tag = $('#hoverTag');
-function showTag(text, e) { tag.textContent = text; tag.classList.add('on'); moveTag(e); }
-function moveTag(e) { tag.style.left = e.clientX + 'px'; tag.style.top = e.clientY + 'px'; }
-function hideTag() { tag.classList.remove('on'); }
+/* ---------- Pistas y rarezas ---------- */
+function gainClue(k, lines) {
+  if (S.clues[k]) return;
+  S.clues[k] = true;
+  const n = clueCount();
+  setTimeout(() => { Sfx.clue(); toast(`PISTA ${n}/3`, CLUE_NAMES[k]); }, 250);
+  const extra = n === 3 ? ['Tengo las tres piezas. La placa de la caja fuerte marca el orden.'] : [];
+  think([].concat(lines || [], extra));
+  renderObjectives();
+  if (n === 2 && !S.f.phoneDone) setTimeout(startRinging, 9000);
+}
+function checkLuna() {
+  if (S.seen.mail && S.seen.calendar && !S.clues.luna)
+    gainClue('luna', ['«La luna duerme el día en que cerramos.» Y el calendario dice que cerraron el 14.', 'Luna: catorce.']);
+}
 
 /* ---------- Escena principal: qué pasa al tocar cada cosa ---------- */
 const ACT = {
@@ -18,7 +39,11 @@ const ACT = {
       : 'La «E» del cartel se apaga y se enciende. Lleva así toda la noche.');
     if (Math.random() < 0.5) setTimeout(lightning, 500);
   },
-  puerta() { think('La puerta por la que entré. «SEGUROS FERRAZ», al revés desde este lado. Prefiero no darle la espalda.'); },
+  puerta() {
+    if (S.f.ch1Done) { goCap2(); return; }
+    if (S.f.docTaken) { think('Todavía no. En la caja había algo más.'); return; }
+    think('La puerta por la que entré. «SEGUROS FERRAZ», al revés desde este lado. Prefiero no darle la espalda.');
+  },
   perchero() {
     if (once('perchero')) think(['Por un segundo creí que había alguien parado en la esquina.', 'Es solo un perchero. Un abrigo y un sombrero.']);
     else { noteOdd('abrigo'); think(['Toco el abrigo. Está mojado.', 'Afuera llueve desde la tarde. Y esta oficina lleva cerrada desde 1987.']); }
@@ -68,8 +93,7 @@ const USE_FAIL = {
   uv: 'Paso la luz violeta. Nada. Solo polvo y pelusas fosforescentes.',
   llave: 'La llave es demasiado pequeña para esto.',
 };
-function onHot(id) {
-  if (Dialog.open || S.ended) return;
+function onHot1(id) {
   Sfx.click();
   if (S.sel && !['cuadro', 'archivador', 'pared'].includes(id) && !(S.sel === 'uv' && id === 'caja')) {
     think(USE_FAIL[S.sel]); return;
@@ -84,13 +108,8 @@ function straightenPainting() {
   step();
 }
 
-/* ---------- Primeros planos ---------- */
-const bakedCU = {};
-const cuBake = (key, fn) => bakedCU[key] || (bakedCU[key] = bake(fn(), { x: -40, y: -40, w: 1680, h: 980, amp: 3.6, cu: true }));
-const hotPath = (id, name, pts) => `<path class="hot" data-id="${id}" data-name="${name}" tabindex="0" role="button" aria-label="${name}" d="M${pts.map(p => p.join(' ')).join('L')}Z"/>`;
-const box = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
-
-const CU = {
+/* ---------- Primeros planos de la oficina ---------- */
+regCU({
   desk: {
     title: 'ESCRITORIO DE FERRAZ',
     enter() { if (once('desk')) think('El escritorio de Ferraz. Todo quedó como si fuera a volver mañana.'); },
@@ -227,19 +246,8 @@ const CU = {
       },
     },
   },
-};
-for (const k in CU) CU[k].render = () => renderCloseup();
+});
 
-function openCloseup(key) {
-  S.cu = key; hideTag(); $('#closeup').classList.add('on'); renderCloseup(); layout(); CU[key].enter?.();
-}
-function closeCloseup() { S.cu = null; $('#closeup').classList.remove('on'); $('#cuHtml').innerHTML = ''; hideTag(); }
-function renderCloseup() {
-  const c = CU[S.cu]; if (!c) return;
-  $('#cuTitle').textContent = c.title; $('#cuSvg').innerHTML = c.svg(); hydrate($('#cuSvg')); $('#cuHtml').innerHTML = ''; c.html?.();
-  bindHots($('#cuSvg'), id => { if (Dialog.open) return; Sfx.click(); c.hot[id]?.(); });
-}
-function turnDrum(i, d) { S.drums[i] = (S.drums[i] + d + 100) % 100; $('#drum' + i).textContent = String(S.drums[i]).padStart(2, '0'); Sfx.dial(); }
 function showPolaroid() {
   const d = document.createElement('div');
   Object.assign(d.style, { position: 'absolute', inset: '0', display: 'grid', placeItems: 'center', background: 'rgba(5,3,8,.7)', cursor: 'pointer', zIndex: 4 });
@@ -296,43 +304,21 @@ function openSafe() {
   think(['Catorce, veintitrés, treinta y uno. La manija cede.', 'Adentro hay una carpeta… y una foto instantánea.']);
   setTimeout(renderCloseup, 400);
 }
+
 async function maybeEnd() {
-  if (!S.f.docTaken || !S.f.photoSeen || S.ended || S.ending) return;
+  if (!S.f.docTaken || !S.f.photoSeen || S.f.ch1Done || S.ending) return;
   S.ending = true;
-  await new Promise(r => setTimeout(r, 1800));
+  await wait(1800);
   closeCloseup(); lightning();
   await Dialog.say([C('Polilla, ¿lo tienes?'), C('Bien. Ahora sal de ahí. No toques nada más.'),
     C('…Espera. El registro de la puerta del edificio marca una sola entrada esta noche.', 'alarma'), C('La tuya. A las 23:47.', 'alarma')]);
-  think('Entonces… ¿quién sacó esa foto a las 23:46?');
-  await new Promise(r => setTimeout(r, 2600));
-  S.ended = true; renderObjectives(); showEnding();
-}
-function showEnding() {
-  const t = Math.round((Date.now() - S.t0) / 1000), mm = String(Math.floor(t / 60)).padStart(2, '0'), ss = String(t % 60).padStart(2, '0');
-  const odd = Object.keys(ODD).filter(k => S.odd.has(k));
-  $('#endSheet').innerHTML = `
-    <div class="stamp" style="right:24px;top:30px">RECUPERADO</div>
-    <div class="kicker">SECCIÓN OCASO · INFORME DE MISIÓN · EXPEDIENTE 07</div>
-    <h1>OPERACIÓN<br>MEDIANOCHE</h1>
-    <div class="field">
-      <b>Agente:</b><span class="hand">«Polilla»</span>
-      <b>Objetivo:</b><span>Expediente NOCTUA — recuperado</span>
-      <b>Combinación:</b><span>luna 14 · ojo 23 · ancla 31</span>
-      <b>Tiempo:</b><span>${mm}:${ss}</span>
-      <b>Errores:</b><span>${S.f.wrongPass} ${S.f.wrongPass === 1 ? 'clave' : 'claves'} · ${S.f.wrongSafe} ${S.f.wrongSafe === 1 ? 'intento' : 'intentos'} en la caja</span>
-      <b>Rarezas:</b><span>${odd.length}/${Object.keys(ODD).length} anotadas</span>
-    </div>
-    ${odd.length ? `<ul>${odd.map(k => `<li>${ODD[k]}</li>`).join('')}</ul>` : ''}
-    <p class="hand" style="font-size:18px;color:#5b1f2e">«La puerta registró una sola entrada esta noche. Descansa, Polilla. Mañana hablamos de esa foto.» — Control</p>
-    <p style="font-weight:bold;letter-spacing:.2em">FIN DE LA DEMO</p>
-    <div class="row"><button class="btn" id="btnAgain">VOLVER A JUGAR</button></div>`;
-  $('#ending').classList.add('on'); Sfx.stamp();
-  $('#btnAgain').onclick = () => location.reload();
+  think(['Entonces… ¿quién sacó esa foto a las 23:46?', 'No me voy a quedar a averiguarlo. La puerta.']);
+  S.f.ch1Done = true; S.ending = false; renderObjectives();
 }
 
 /* ---------- Teléfono ---------- */
 function startRinging() {
-  if (S.f.phoneDone || S.f.ringing || S.ended) return;
+  if (S.f.phoneDone || S.f.ringing || S.ended || S.cap !== 1) return;
   S.f.ringing = true; Sfx.ringStart();
   think('…¿Está sonando el teléfono?');
   S.ringStop = setTimeout(() => { if (S.f.ringing) { S.f.ringing = false; S.f.phoneDone = true; Sfx.ringStop(); think('Dejó de sonar.'); } }, 24000);
@@ -344,79 +330,46 @@ async function answerPhone() {
   think(['Ese teléfono no tiene línea desde 1987.', 'Y nadie fuera de la Sección conoce mi nombre clave.']);
 }
 
-/* ---------- Ambiente vivo: neón, motas, relámpagos, timbre ---------- */
-function lightning() {
-  const fl = $('#flash'), sky = $('#skyFlash');
-  const pulse = (o, d) => { fl.style.transition = 'none'; fl.style.opacity = o; sky.setAttribute('opacity', o * 1.6); setTimeout(() => { fl.style.transition = `opacity ${d}ms`; fl.style.opacity = 0; sky.setAttribute('opacity', 0); }, 60); };
-  pulse(0.35, 220); setTimeout(() => pulse(0.22, 600), 180);
-  setTimeout(() => Sfx.thunder(), 700 + Math.random() * 900);
-}
-function scheduleLightning() { setTimeout(() => { if (S.started && !S.ended) lightning(); scheduleLightning(); }, 22000 + Math.random() * 26000); }
-const motes = [];
-let lastT = 0;
-function loop(t) {
-  const dt = Math.min(0.05, (t - lastT) / 1000 || 0); lastT = t;
-  // Neón que respira con caídas al azar; la «E» rota se apaga más. A ~10 Hz: basta para el ojo
-  // y cada cambio obliga a recomponer la capa de luces.
-  if (t - (loop.neonT || 0) > 95) {
-    loop.neonT = t;
-    const n = Math.random() < 0.06 ? 0.25 : 0.85 + Math.sin(t / 900) * 0.08;
-    const ng = $('#neonGlow'), sg = $('#neonSign');
-    if (ng) { ng.setAttribute('opacity', n.toFixed(2)); sg.setAttribute('opacity', (0.5 + n * 0.5).toFixed(2)); Sfx.neon(n); }
-    $$('.neonBroken').forEach(e => e.setAttribute('opacity', Math.random() < 0.18 ? 0.15 : 1));
-  }
-  // Lluvia (~30 Hz basta) y motas de polvo en el haz de luna (~20 Hz: flotan lento)
-  if (t - (loop.rainT || 0) > 33) {
-    loop.rainT = t;
-    const k = (t % 550) / 550, rn = $('#rain');
-    if (rn) rn.setAttribute('transform', `translate(${f1(20 - 30 * k)} ${f1(-320 + 320 * k)})`);
-  }
-  if (t - (loop.moteT || 0) > 50) {
-    const mdt = (t - (loop.moteT || t)) / 1000; loop.moteT = t;
-    if (!motes.length) $$('.mote').forEach(m => motes.push({ m, x: +m.getAttribute('cx'), y: +m.getAttribute('cy'), s: 3 + Math.random() * 6, p: Math.random() * 6 }));
-    for (const o of motes) { o.y -= o.s * mdt; o.x += Math.sin(t / 1800 + o.p) * 6 * mdt; if (o.y < 220) o.y = 860; o.m.setAttribute('cx', o.x.toFixed(1)); o.m.setAttribute('cy', o.y.toFixed(1)); }
-  }
-  // El teléfono vibra mientras suena
-  const ph = $('#gPhone');
-  if (ph) ph.setAttribute('transform', S.f.ringing && Math.floor(t / 2600 * 2) % 2 === 0 && (t % 2600) < 1000 ? `translate(${(Math.random() * 4 - 2).toFixed(1)} ${(Math.random() * 2 - 1).toFixed(1)})` : '');
-  requestAnimationFrame(loop);
+/* ---------- Objetivos y libreta del capítulo ---------- */
+function objectives1() {
+  const n = clueCount(), L = [];
+  L.push({ t: 'Recuperar el Expediente NOCTUA', done: S.f.docTaken, main: true });
+  L.push({ t: `Reunir las 3 pistas (${n}/3)`, done: n === 3 });
+  if (S.seen.cabLocked) L.push({ t: 'Abrir el archivador', done: S.f.cabOpen });
+  if (S.f.pcOn) L.push({ t: 'Descubrir la clave de Ferraz', done: S.f.logged });
+  if (S.seen.mail) L.push({ t: '¿Qué día cerró la oficina?', done: !!S.seen.calendar });
+  if (S.seen.mail || has('uv')) L.push({ t: 'Hallar el ancla «a oscuras»', done: S.clues.ancla });
+  if (n === 3 || S.f.safeOpen) L.push({ t: 'Abrir la caja (luna·ojo·ancla)', done: S.f.safeOpen });
+  if (S.f.docTaken) L.push({ t: 'Salir de ahí', done: S.ended });
+  return L;
 }
 
-/* ---------- Linterna UV: la mancha de luz sigue al puntero ---------- */
-function toScene(svg, e) { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
-function moveUV(e) {
-  if (S.sel !== 'uv') return;
-  const p = toScene($('#scene'), e);
-  for (const id of ['uvSpot', 'uvBeam']) { const c = $('#' + id); c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); }
+function nbPage1(tab) {
+  let h = '';
+  if (tab === 'luna') {
+    h = `<div class="sub">PISTA 01 · SÍMBOLO DE LA LUNA</div><h2>La luna duerme…</h2><div class="clip">`;
+    h += `<svg viewBox="0 0 300 220">${symMoon(52, 60, 34)}<text x="110" y="52" font-family="${typeFont}" font-size="14" font-weight="bold">«La luna duerme</text><text x="110" y="72" font-family="${typeFont}" font-size="14" font-weight="bold">el día en que</text><text x="110" y="92" font-family="${typeFont}" font-size="14" font-weight="bold">cerramos.»</text>`
+      + (S.seen.calendar ? `<rect x="110" y="120" width="90" height="80" fill="#e8dcc2" stroke="${INK}" stroke-width="3"/><rect x="110" y="120" width="90" height="20" fill="#7c2434"/><text x="155" y="135" text-anchor="middle" font-family="${typeFont}" font-size="11" fill="#e8dcc2" font-weight="bold">OCT 1987</text><text x="155" y="180" text-anchor="middle" font-family="${typeFont}" font-size="30" font-weight="bold">14</text><ellipse cx="155" cy="170" rx="30" ry="22" fill="none" stroke="#e0283f" stroke-width="3"/>` : '')
+      + `</svg>`;
+    h += S.seen.mail ? `<div class="txt">Del correo de Ferraz.${S.seen.calendar ? '<br>El calendario del escritorio marca el <b>CIERRE</b> el 14 de octubre.<br><b>☾ = 14</b>' : '<br>¿Qué día cerró la oficina?'}</div>` : nbNone('Ferraz habrá dejado algo en su computadora.');
+    h += `</div>`;
+  } else if (tab === 'ojo') {
+    h = `<div class="sub">PISTA 02 · SÍMBOLO DEL OJO</div><h2>Lo que cuento</h2><div class="clip">`;
+    h += S.clues.ojo ? `<svg viewBox="0 0 300 260"><rect width="300" height="260" fill="#e3d6bc"/>${tallySheet(150, 150, 0.62)}</svg><div class="txt">Hoja del archivador (cajón 1).<br>Un ojo y rayas de conteo en grupos de cinco.<br>¿Cuántas son?</div>` : nbNone('Algo guardado bajo llave.');
+    h += `</div>`;
+  } else if (tab === 'ancla') {
+    h = `<div class="sub">PISTA 03 · SÍMBOLO DEL ANCLA</div><h2>Solo a oscuras</h2><div class="clip">`;
+    h += S.clues.ancla ? `<svg viewBox="0 0 300 220"><rect width="300" height="220" fill="#1c2436"/><g filter="url(#glowUV)">${symAnchor(90, 110, 44, '#e8c2ff', 7)}<text x="200" y="130" text-anchor="middle" font-family="Rockwell,Georgia,serif" font-weight="900" font-size="54" fill="#e8c2ff">XXXI</text></g></svg><div class="txt">Tinta invisible en el cuadro del faro, revelada con la linterna UV.<br>Números romanos.</div>` : nbNone('«El ancla solo aparece a oscuras.»');
+    h += `</div>`;
+  } else if (tab === 'placa') {
+    h = `<div class="sub">CAJA FUERTE HALCÓN · TRES RUEDAS 00–99</div><h2>El orden</h2><div class="clip">`;
+    h += S.seen.plate ? `<svg viewBox="0 0 300 120"><rect x="10" y="10" width="280" height="100" rx="6" fill="#b08a4a" stroke="${INK}" stroke-width="4"/>${symMoon(70, 60, 26)}${symEye(150, 60, 34, INK, 5)}${symAnchor(230, 60, 32, INK, 5)}</svg><div class="txt">Rueda I: luna<br>Rueda II: ojo<br>Rueda III: ancla</div>` : nbNone('Mira la caja fuerte de cerca.');
+    h += `</div>`;
+  }
+  return h;
 }
 
-/* ---------- Encuadre: la cámara no se mueve, pero el marco se adapta ---------- */
-const SAFE_BOX = { x0: 150, x1: 1450, y0: 100, y1: 815 };     // zona que siempre debe verse
-function layout() {
-  const st = $('#stage').getBoundingClientRect(), a = st.width / Math.max(1, st.height);
-  let vw = 1600, vh = 1600 / a;
-  if (vh > 900) { vh = 900; vw = 900 * a; }
-  if (vh < SAFE_BOX.y1 - SAFE_BOX.y0) { vh = SAFE_BOX.y1 - SAFE_BOX.y0; vw = vh * a; }
-  if (vw < SAFE_BOX.x1 - SAFE_BOX.x0) { vw = SAFE_BOX.x1 - SAFE_BOX.x0; vh = vw / a; }
-  const cy = clamp(450, SAFE_BOX.y1 - vh / 2, SAFE_BOX.y0 + vh / 2);
-  const vb = `${f1(800 - vw / 2)} ${f1(cy - vh / 2)} ${f1(vw)} ${f1(vh)}`;
-  $$('.lay').forEach(s => s.setAttribute('viewBox', vb));
-  const fw = Math.min(st.width * 0.97, st.height * 0.95 * 16 / 9), fr = $('#cuFrame');
-  fr.style.width = fw + 'px'; fr.style.height = fw * 9 / 16 + 'px';
-  $('#rotateHint').classList.toggle('on', innerHeight > innerWidth && innerWidth < 640 && !S.rotateOk);
-}
-
-/* ---------- Enlaces de entrada ---------- */
-function bindHots(root, fn) {
-  $$('.hot', root).forEach(h => {
-    h.addEventListener('click', e => { e.stopPropagation(); moveUV(e); fn(h.dataset.id); });
-    h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(h.dataset.id); } });
-    h.addEventListener('pointerenter', e => showTag(h.dataset.name, e));
-    h.addEventListener('pointermove', moveTag);
-    h.addEventListener('pointerleave', hideTag);
-  });
-}
-function hintNow() {
+function hint1() {
   const n = clueCount();
   const H = [
     [!S.f.pcOn, 'Esa computadora vieja… si todavía tiene corriente, puede que Ferraz haya dejado algo.'],
@@ -430,63 +383,52 @@ function hintNow() {
     [!S.clues.ancla && has('uv'), '«El ancla solo aparece a oscuras, en el mar que pinté». La linterna UV sobre el cuadro.'],
     [n === 3 && !S.f.safeOpen, 'Luna, ojo, ancla. El día del cierre, las rayas contadas y los números romanos traducidos.'],
     [S.f.safeOpen && !S.f.docTaken, 'La caja está abierta. El expediente me espera.'],
+    [S.f.docTaken && !S.f.photoSeen, 'En la caja había algo más, junto al expediente.'],
+    [S.f.ch1Done, 'Control tiene razón: hay que salir de aquí. La puerta.'],
   ];
   const h = H.find(x => x[0]);
   think(h ? h[1] : 'Observa. Todo en esta oficina está aquí por una razón.');
 }
-function bindUI() {
-  bindHots($('#scene'), onHot);
-  $('#scene').addEventListener('pointermove', moveUV);
-  $('#scene').addEventListener('pointerdown', moveUV);
-  $('#scene').addEventListener('click', () => { if (S.sel && !Dialog.open) { S.sel = null; applyCursor(); renderInv(); } });
-  $('#thoughts').onclick = () => Thought.next();
-  $('#cuBack').onclick = e => { e.stopPropagation(); Sfx.click(); closeCloseup(); };
-  $('#closeup').addEventListener('click', e => { if (e.target.id === 'closeup') closeCloseup(); });
-  $('#nbClose').onclick = () => { Sfx.click(); closeNotebook(); };
-  $('#notebook').addEventListener('click', e => { if (e.target.id === 'notebook') closeNotebook(); });
-  $('#btnBook').onclick = () => { Sfx.click(); openNotebook(); };
-  $('#btnHint').onclick = () => { Sfx.click(); hintNow(); };
-  $('#btnMute').onclick = () => toggleMute();
-  $('#btnRotateAnyway').onclick = () => { S.rotateOk = true; layout(); };
-  $('#btnStart').onclick = startGame;
-  addEventListener('resize', layout);
-  addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT') return;
-    if (Dialog.open && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); Dialog.advance(); return; }
-    if (e.key === 'Escape') { if ($('#notebook').classList.contains('on')) closeNotebook(); else if (S.cu) closeCloseup(); else if (S.sel) { S.sel = null; applyCursor(); renderInv(); } }
-    if (e.key === 'n' || e.key === 'N') { $('#notebook').classList.contains('on') ? closeNotebook() : openNotebook(); }
-    if (e.key === 'm' || e.key === 'M') toggleMute();
-  });
-}
-function toggleMute() {
-  Sfx.setMuted(!Sfx.muted);
-  $('#muteIco').setAttribute('d', Sfx.muted ? 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6' : 'M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11');
+
+/* ---------- Ambiente vivo de la oficina: neón, lluvia y el teléfono que vibra ---------- */
+function tick1(t) {
+  // Neón que respira con caídas al azar; la «E» rota se apaga más. A ~10 Hz: basta para el ojo
+  // y cada cambio obliga a recomponer la capa de luces.
+  if (t - (tick1.neonT || 0) > 95) {
+    tick1.neonT = t;
+    const n = Math.random() < 0.06 ? 0.25 : 0.85 + Math.sin(t / 900) * 0.08;
+    const ng = $('#neonGlow'), sg = $('#neonSign');
+    if (ng) { ng.setAttribute('opacity', n.toFixed(2)); sg.setAttribute('opacity', (0.5 + n * 0.5).toFixed(2)); Sfx.neon(n); }
+    $$('.neonBroken').forEach(e => e.setAttribute('opacity', Math.random() < 0.18 ? 0.15 : 1));
+  }
+  // Lluvia (~30 Hz basta)
+  if (t - (tick1.rainT || 0) > 33) {
+    tick1.rainT = t;
+    const k = (t % 550) / 550, rn = $('#rain');
+    if (rn) rn.setAttribute('transform', `translate(${f1(20 - 30 * k)} ${f1(-320 + 320 * k)})`);
+  }
+  // El teléfono vibra mientras suena
+  const ph = $('#gPhone');
+  if (ph) ph.setAttribute('transform', S.f.ringing && Math.floor(t / 2600 * 2) % 2 === 0 && (t % 2600) < 1000 ? `translate(${(Math.random() * 4 - 2).toFixed(1)} ${(Math.random() * 2 - 1).toFixed(1)})` : '');
 }
 
-/* ---------- Arranque ---------- */
-async function startGame() {
-  Sfx.init(); $('#title').classList.remove('on'); S.started = true; S.t0 = Date.now();
-  think('…');
-  await Dialog.say([
-    C('Polilla, aquí Control. ¿Me recibes? Bien.'),
-    C('Estás en el tercer piso de Seguros Ferraz. Cerrado desde 1987. Nadie ha entrado desde entonces… en teoría.'),
-    C('Aurelio Ferraz guardó el Expediente NOCTUA en la caja fuerte de su oficina antes de desaparecer. Lo queremos de vuelta.'),
-    C('Ferraz no confiaba en nadie. Repartió la combinación por la oficina: busca tres pistas.'),
-    C('Y Polilla… no toques nada que no necesites. Ese edificio tiene mala fama.'),
-  ]);
-  think(['Huele a papel húmedo, a polvo… y a algo más.', 'Empecemos. Con calma: todo lo que necesito está en esta habitación.']);
-  scheduleLightning(); setTimeout(lightning, 4000);
-}
-function boot() {
-  buildScene(); applyCursor(); renderInv(); renderObjectives(); bindUI(); layout();
-  requestAnimationFrame(loop);
-  think('Haz clic en «Aceptar misión».');
-  if (QS.has('shot')) { $('#title').classList.remove('on'); S.started = true; S.t0 = Date.now(); think('Huele a papel húmedo, a polvo… y a algo más.'); }
-}
-// API de prueba (para recorridos automáticos): __game.fast = true salta diálogos
-window.__game = {
-  S, fast: false, CU, onHot, openCloseup, closeCloseup, tryPass, turnDrum, clickItem, layout, lightning, startRinging, answerPhone, hintNow, openNotebook,
-  cuHot: id => CU[S.cu].hot[id](),
-  setDrums: v => { S.drums = v.slice(); if (S.cu === 'safe') renderCloseup(); },
+/* ---------- Registro del capítulo ---------- */
+CAPS[1] = {
+  label: 'La oficina de Aurelio Ferraz, de noche',
+  build: buildScene,
+  onHot: onHot1,
+  objectives: objectives1,
+  counter: () => `PISTAS ${clueCount()}/3`,
+  nbTabs: () => [['luna', '01 LUNA'], ['ojo', '02 OJO'], ['ancla', '03 ANCLA'], ['placa', 'PLACA']],
+  nbPage: nbPage1,
+  hint: hint1,
+  tick: tick1,
+  useItem(k) {
+    if (k === 'foto') { think('«Tango, verano del 79. El único que siempre me espera.» Ferraz y su perro. Lo único alegre de esta oficina.'); return true; }
+    if (k === 'expediente') { think('El Expediente NOCTUA. Pesa más de lo que debería.'); return true; }
+  },
+  selLine(k) {
+    if (k === 'uv') return 'Enciendo la linterna UV. Todo se vuelve violeta… La tinta invisible debería brillar bajo esta luz.';
+    if (k === 'llave') return 'La llave pequeña. ¿Qué cerradura es tan diminuta?';
+  },
 };
-boot();
